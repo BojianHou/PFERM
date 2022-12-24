@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="e5bc9abc-af33-4426-b5d0-ea148f9f4c8a" name="FERM">
+        <fileTransfer rootFolder="/gpfs/fs001/cbica/home/houbo" accessType="SFTP" host="cubic-login.uphs.upenn.edu" port="22" sshConfigId="c1cde310-6c2b-4712-a020-8e849c1b9401" sshConfig="houbo@cubic-login.uphs.upenn.edu:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
