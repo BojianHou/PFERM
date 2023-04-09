@@ -63,13 +63,76 @@ class Linear_FERM:
             self.model.fit(self.dataset.data, self.dataset.target)
 
 
+class Linear_PFERM(Linear_FERM):
+    def __init__(self, dataset, model, sensible_feature, prior=False, pi=1):
+        self.dataset = dataset
+        self.values_of_sensible_feature = np.unique(sensible_feature)  # sorted feature values small to large
+        self.list_of_sensible_feature_train = sensible_feature
+        self.model = model
+        self.u = None
+        self.max_i = None
+        self.prior = prior
+        self.pi = pi  # the ratio between two groups
+
+
+    def fit(self):
+
+        # Evaluation of the vector u (difference among the two averages)
+        self.group_list = []  # the list of mean value of each group with positive class, such as male and female or different races
+        for val in self.values_of_sensible_feature:
+            self.group_list.append(np.mean(
+                [ex for idx, ex in enumerate(self.dataset.data)
+                 if self.dataset.target[idx] == 1 and sensible_feature[idx] == val], 0))
+        # calculate all the u (i.e., u_1 - u_k)
+        self.u_list = []
+        first_group_mean = self.group_list[0]
+        for idx, group_mean in enumerate(self.group_list):
+            if idx == 0:
+                continue
+            self.u_list.append(first_group_mean - group_mean)
+
+        # if self.prior:  # we have some prior knowledge that the probability of female getting AD is twice that of male
+        #     self.u = -(average_A_1 - self.pi * average_not_A_1)
+        # else:
+        #     self.u = -(average_A_1 - average_not_A_1)
+        # self.max_i = np.argmax(self.u)
+
+        # Application of the new representation
+        num_u = len(self.u_list)  # the number of u is g-1 where g is the number of all the groups
+        # U = np.empty(num_u, num_u)  # U is the matrix of all u
+        U = []
+        # Uk_list is the list of all the U_k
+        # U_k is the matrix of all u where the kth element of each u (each row) is replaced by u_k
+        Uk_list = [[]] * num_u
+        for u in self.u_list:
+            U.append(u[:num_u])
+        U = np.array(U)
+
+        for idx, u in enumerate(self.u_list):
+            temp_u = u
+            temp_u[idx] = u[idx]
+            Uk_list[idx].append(temp_u[:num_u])
+
+
+        newdata = np.array([ex - self.u * (ex[self.max_i] / self.u[self.max_i]) for ex in self.dataset.data])
+        newdata = np.delete(newdata, self.max_i, 1)
+        self.dataset = namedtuple('_', 'data, target')(newdata, self.dataset.target)
+
+        # Fitting the linear model by using the new data
+        if self.model:
+            self.model.fit(self.dataset.data, self.dataset.target)
+
+
 if __name__ == "__main__":
     start_time = time.perf_counter()
     print('start time is: ', start_time)
 
     # Load Adult dataset
-    dataset_train, dataset_test = load_adult(smaller=False)
-    sensible_feature = 9  # GENDER
+    # dataset_train, dataset_test = load_adult(smaller=False)
+    X_train, X_test, y_train, y_test, sensible_feature, pi = load_adult(seed=0, smaller=True)
+    dataset_train = namedtuple('_', 'data, target')(X_train, y_train)
+    dataset_test = namedtuple('_', 'data, target')(X_test, y_test)
+    # sensible_feature = 9  # GENDER
     sensible_feature_values = sorted(list(set(dataset_train.data[:, sensible_feature])))
     print('Different values of the sensible feature', sensible_feature, ':', sensible_feature_values)
     ntrain = len(dataset_train.target)

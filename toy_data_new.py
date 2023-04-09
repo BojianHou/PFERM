@@ -1,7 +1,14 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import time
-
+from linear_ferm import Linear_FERM
+from ferm import FERM
+from sklearn import svm
+from sklearn.metrics import accuracy_score
+import numpy as np
+from measures import equalized_odds_measure_TP
+from sklearn.model_selection import GridSearchCV
+from collections import namedtuple
 
 def generate_toy_data(n_samples, n_samples_low, n_dimensions):
     np.random.seed(0)
@@ -35,15 +42,6 @@ def generate_toy_data(n_samples, n_samples_low, n_dimensions):
 if __name__ == "__main__":
     start_time = time.perf_counter()
     print('start time is: ', start_time)
-
-    from linear_ferm import Linear_FERM
-    from ferm import FERM
-    from sklearn import svm
-    from sklearn.metrics import accuracy_score
-    import numpy as np
-    from measures import equalized_odds_measure_TP
-    from sklearn.model_selection import GridSearchCV
-    from collections import namedtuple
 
     pi = 5  # it means that the probability of female getting AD is the \pi times that of male
     print('-----------------PI is: {}-----------------'.format(pi))
