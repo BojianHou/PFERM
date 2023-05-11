@@ -23,6 +23,7 @@ def draw_pie(counts_list, labels, ROI='All AV45'):
     plt.savefig('figures/{} in {}.png'.format(' vs '.join(labels), ROI),
                 bbox_inches='tight')
     plt.show()
+    plt.close()
 
 
 def make_error_boxes(ax, x, y, x_min, x_max, y_min, y_max, method, facecolor='pink',
@@ -70,9 +71,10 @@ def plot_box_bak(data, result_mean, result_std, is_linear=True, y_axis='DEO'):
     ax.legend(fontsize=14)
     plt.savefig(file_name, dpi=100)
     plt.show()
+    plt.close()
 
 
-def plot_box(data, result_mean, result_std, is_linear=True, y_axis='DEO'):
+def plot_box(data, result_mean, result_std, constraint='EO', is_linear=True, y_axis='DEO'):
     # Create figure and axes
     # y_axis can be DEO or DDP, which refers to difference between equalized odds and demographic parity
     fig, ax = plt.subplots(1)
@@ -82,11 +84,11 @@ def plot_box(data, result_mean, result_std, is_linear=True, y_axis='DEO'):
     Method = ["SVM", "FERM", "PFERM"]
     # for i in range(len(Method)):
     if is_linear:
-        title_name = "Accuracy vs {} Linear on {} Data".format(y_axis, data)
-        file_name = "./figures/accuracy_vs_{}_{}_linear.png".format(y_axis, data)
+        title_name = "Accuracy vs {} Linear on {} Data with Constraint {}".format(y_axis, data, constraint)
+        file_name = "./figures/accuracy_vs_{}_{}_linear_constraint_{}.png".format(y_axis, data, constraint)
     else:
-        title_name = "Accuracy vs {} Nonlinear on {} Data".format(y_axis, data)
-        file_name = "./figures/results_vs_{}_{}_nonlinear.png".format(y_axis, data)
+        title_name = "Accuracy vs {} Nonlinear on {} Data with Constraint {}".format(y_axis, data, constraint)
+        file_name = "./figures/results_vs_{}_{}_nonlinear_constraint_{}.png".format(y_axis, data, constraint)
     for i in range(3):
         x = float(result_mean["ACC"][i])
         y = float(result_mean[y_axis][i])
@@ -104,3 +106,4 @@ def plot_box(data, result_mean, result_std, is_linear=True, y_axis='DEO'):
     ax.legend(fontsize=14)
     plt.savefig(file_name, dpi=100)
     plt.show()
+    plt.close()

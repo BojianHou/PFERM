@@ -24,7 +24,8 @@ def gaussian_kernel(x, y, gamma=0.1):
 
 class FERM(BaseEstimator):
     # FERM algorithm
-    def __init__(self, kernel='rbf', C=1.0, sensible_feature=None, gamma=1.0, prior=False, pi=1):
+    def __init__(self, kernel='rbf', C=1.0, sensible_feature=None,
+                 gamma=1.0, prior=False, pi=1, constraint='EO', lamda=0.5):
         self.kernel = kernel
         self.C = C
         self.fairness = False if sensible_feature is None else True
@@ -33,6 +34,8 @@ class FERM(BaseEstimator):
         self.w = None
         self.prior = prior  # added by hobo, whether to use prior knowledge
         self.pi = pi  # pi as the prior knowledge, is the ratio between two groups
+        self.constraint = constraint  # whether to use EO or DP as constraint
+        self.lamda = lamda
 
     def fit(self, X, y):
         if self.kernel == 'rbf':
@@ -87,12 +90,22 @@ class FERM(BaseEstimator):
         if self.fairness:
             if self.prior: # prior knowledge that the probability of female getting AD is twice that of male
                 if isinstance(self.pi, list):
+                    # tau = [(np.sum(K[self.set_A1, idx]) / self.n_A1) -
+                    #        self.pi[0] * (np.sum(K[self.set_not_A1, idx]) / self.n_not_A1)
+                    #        for idx in range(len(y))]
+
+                    # we do the combination between \pi and 1, (1-\lambda) * \pi + \lambda
                     tau = [(np.sum(K[self.set_A1, idx]) / self.n_A1) -
-                           self.pi[0] * (np.sum(K[self.set_not_A1, idx]) / self.n_not_A1)
+                           ((1 - self.lamda) * self.pi[0] + self.lamda) * (np.sum(K[self.set_not_A1, idx]) / self.n_not_A1)
                            for idx in range(len(y))]
                 else:
+                    # tau = [(np.sum(K[self.set_A1, idx]) / self.n_A1) -
+                    #        self.pi * (np.sum(K[self.set_not_A1, idx]) / self.n_not_A1)
+                    #        for idx in range(len(y))]
+
+                    # we do the combination between \pi and 1, (1-\lambda) * \pi + \lambda
                     tau = [(np.sum(K[self.set_A1, idx]) / self.n_A1) -
-                           self.pi * (np.sum(K[self.set_not_A1, idx]) / self.n_not_A1)
+                           ((1 - self.lamda) * self.pi + self.lamda) * (np.sum(K[self.set_not_A1, idx]) / self.n_not_A1)
                            for idx in range(len(y))]
             else:
                 tau = [(np.sum(K[self.set_A1, idx]) / self.n_A1) -
@@ -176,13 +189,17 @@ class PFERM(FERM):
             self.values_of_sensible_feature = np.unique(self.sensible_feature) # sorted feature values small to large
 
             self.group_idx_list = []  # the index list of each group with positive class, such as male and female or different races
-            for val in self.values_of_sensible_feature:
-                self.group_idx_list.append(
-                    [idx for idx, ex in enumerate(X)
-                     if y[idx] == 1 and self.sensible_feature[idx] == val])
-                # self.group_idx_list.append(
-                #     [idx for idx, ex in enumerate(X)
-                #      if self.sensible_feature[idx] == val])
+
+            if self.constraint == 'EO':  # equalized odds as constraint
+                for val in self.values_of_sensible_feature:
+                    self.group_idx_list.append(
+                        [idx for idx, ex in enumerate(X)
+                         if y[idx] == 1 and self.sensible_feature[idx] == val])
+            else:  # demographic parity as constraint
+                for val in self.values_of_sensible_feature:
+                    self.group_idx_list.append(
+                        [idx for idx, ex in enumerate(X)
+                         if self.sensible_feature[idx] == val])
 
             self.n_list = [len(idx) for idx in self.group_idx_list]  # number of positive instances in each group
 
@@ -228,13 +245,14 @@ class PFERM(FERM):
                     if isinstance(self.pi, list):
                         self.tau_list.append(
                             [(np.sum(K[group_idx, idx]) / current_n) -
-                             self.pi[i-1] * (np.sum(K[first_group_idx, idx]) / first_n)
+                             ((1 - self.lamda) * self.pi[i-1] + self.lamda) * (np.sum(K[first_group_idx, idx]) / first_n)
                              for idx in range(len(y))])
                     else:
                         self.tau_list.append(
                             [(np.sum(K[group_idx, idx]) / current_n) -
-                             self.pi * (np.sum(K[first_group_idx, idx]) / first_n)
+                             ((1 - self.lamda) * self.pi + self.lamda) * (np.sum(K[first_group_idx, idx]) / first_n)
                              for idx in range(len(y))])
+
             else:
                 self.tau_list = []
                 first_group_idx = self.group_idx_list[0]

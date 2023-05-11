@@ -10,9 +10,10 @@ from sklearn.model_selection import GridSearchCV
 from collections import namedtuple
 from plot import plot_box
 import pickle as pkl
+import argparse
 
 
-def train_test(X_train, X_test, y_train, y_test, sensible_feature_idx, pi, is_linear=False):
+def train_test(X_train, X_test, y_train, y_test, sensible_feature_idx, args, pi, is_linear=False):
 
     if is_linear:
         kernel = 'linear'
@@ -34,7 +35,8 @@ def train_test(X_train, X_test, y_train, y_test, sensible_feature_idx, pi, is_li
         = evaluate(X_train, X_test, y_train, y_test, clf, sensible_feature_idx, pi)
 
     print('Grid search for FERM...')
-    algorithm = PFERM(sensible_feature=X_train[:, sensible_feature_idx], kernel=kernel, prior=False)
+    algorithm = PFERM(sensible_feature=X_train[:, sensible_feature_idx],
+                      kernel=kernel, prior=False, constraint=args.constraint, lamda=args.lamda)
     clf = GridSearchCV(algorithm, param_grid, n_jobs=1)
     clf.fit(X_train, y_train)
     print('Best Estimator: FERM(C={}, gamma={})'.
@@ -43,7 +45,8 @@ def train_test(X_train, X_test, y_train, y_test, sensible_feature_idx, pi, is_li
         = evaluate(X_train, X_test, y_train, y_test, clf, sensible_feature_idx, pi)
 
     print('Grid search for PFERM...')
-    algorithm = PFERM(sensible_feature=X_train[:, sensible_feature_idx], kernel=kernel, prior=True, pi=pi)
+    algorithm = PFERM(sensible_feature=X_train[:, sensible_feature_idx],
+                      kernel=kernel, prior=True, pi=pi, constraint=args.constraint, lamda=args.lamda)
     clf = GridSearchCV(algorithm, param_grid, n_jobs=1)
     clf.fit(X_train, y_train)
     print('Best Estimator: PFERM(C={}, gamma={})'.
@@ -131,7 +134,7 @@ def main_bak(dataset, seed=42):
            DDP_NLSVM, DDP_NLFERM, DDP_NLPFERM
 
 
-def main(dataset, is_linear=False, pi=2):
+def main(dataset, args, is_linear=False, pi=2):
 
     print('=================================PI: {}=================================='.format(pi))
 
@@ -148,7 +151,7 @@ def main(dataset, is_linear=False, pi=2):
         test_acc_SVM, test_acc_FERM, test_acc_PFERM, \
         DEO_SVM, DEO_FERM, DEO_PFERM, \
         DDP_SVM, DDP_FERM, DDP_PFERM \
-            = train_test(X_train, X_test, y_train, y_test, sensible_feature_idx, pi, is_linear=is_linear)
+            = train_test(X_train, X_test, y_train, y_test, sensible_feature_idx, args, pi, is_linear=is_linear)
 
         test_acc_SVM_list.append(test_acc_SVM)
         test_acc_FERM_list.append(test_acc_FERM)
@@ -164,8 +167,8 @@ def main(dataset, is_linear=False, pi=2):
     result_std['DEO'] = [np.std(DEO_SVM_list), np.std(DEO_FERM_list), np.std(DEO_PFERM_list)]
     result_std['DDP'] = [np.std(DDP_SVM_list), np.std(DDP_FERM_list), np.std(DDP_PFERM_list)]
 
-    plot_box(dataset, result_mean, result_std, is_linear=is_linear, y_axis='DEO')
-    plot_box(dataset, result_mean, result_std, is_linear=is_linear, y_axis='DDP')
+    plot_box(dataset, result_mean, result_std, constraint=args.constraint, is_linear=is_linear, y_axis='DEO')
+    plot_box(dataset, result_mean, result_std, constraint=args.constraint, is_linear=is_linear, y_axis='DDP')
 
     print('-----SVM------')
     print('ACC Mean±Std {:.4f}±{:.4f}'.format(np.mean(test_acc_SVM_list), np.std(test_acc_SVM_list)))
@@ -181,7 +184,7 @@ def main(dataset, is_linear=False, pi=2):
     print('DDP Mean±Std {:.4f}±{:.4f}'.format(np.mean(DDP_PFERM_list), np.std(DDP_PFERM_list)))
 
     result = {'mean': result_mean, 'std': result_std}
-    with open('./results/result_{}_{}.pkl'.format(dataset, pi), 'wb') as f:
+    with open('./results/result_{}_{}_constraint_{}.pkl'.format(dataset, pi, args.constraint), 'wb') as f:
         pkl.dump(result, f)
 
     return result
@@ -191,21 +194,35 @@ if __name__ == "__main__":
     start_time = time.perf_counter()
     print('start time is: ', start_time)
 
-    # point_size = 150
-    # linewidth = 6
-    # step = 30
-    # alpha = 0.5
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--dataset", type=str, help="dataset name", default="toy_new")
+    parser.add_argument("--constraint", type=str, help="EO or DP as constrain", default='EO')
+    parser.add_argument("--lamda", type=float, help="the trade-off parameter of the pi", default=0.5)
+    args = parser.parse_args()
 
-    dataset = 'toy_new'  # 'adult' 'av45' 'toy_new' 'tadpole' 'toy_3'
+    print(args.constraint)
+    if args.constraint == 'EO':
+        print('We use equalized odds as constraint')
+    else:
+        print('We use demographic parity as constraint')
+
+    dataset = args.dataset  # 'adult' 'av45' 'toy_new' 'tadpole' 'toy_3'
 
     result_list = []
-    for pi in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]:
-        result = main(dataset, is_linear=False, pi=pi)
+    for pi in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]:  # 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+        result = main(dataset, args, is_linear=False, pi=pi)
         result_list.append(result)
 
-    with open('./results/results_all_{}.pkl'.format(dataset), 'wb') as f:
-        pkl.dump(result_list, f)
+    if args.constraint == 'EO':
+        with open('./results/results_all_{}_constraint_EO_lamda_{}.pkl'
+                          .format(dataset, args.lamda), 'wb') as f:
+            pkl.dump(result_list, f)
+    else:
+        with open('./results/results_all_{}_constraint_DP_lamda_{}.pkl'
+                          .format(dataset, args.lamda), 'wb') as f:
+            pkl.dump(result_list, f)
 
+    # draw figure
     x = np.linspace(1, 10, 10)
     measurements = ['ACC', 'DEO', 'DDP']
     methods = ['SVM', 'FERM', 'PFERM']
@@ -216,7 +233,12 @@ if __name__ == "__main__":
             plt.xlabel('PI', fontsize=16)
             plt.ylabel(measure, fontsize=16)
         plt.legend()
-        plt.savefig('./figures/PI_vs_{}_constraint_EO.png'.format(measure))
+        if args.constraint == 'EO':
+            plt.savefig('./figures/PI_vs_{}_constraint_EO_lamda_{}.png'
+                        .format(measure, args.lamda))
+        else:
+            plt.savefig('./figures/PI_vs_{}_constraint_DP_lamda_{}.png'
+                        .format(measure, args.lamda))
         plt.show()
         plt.close()
 
