@@ -195,7 +195,7 @@ if __name__ == "__main__":
     print('start time is: ', start_time)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dataset", type=str, help="dataset name", default="toy_new")
+    parser.add_argument("--dataset", type=str, help="dataset name", default="av45")
     parser.add_argument("--constraint", type=str, help="EO or DP as constrain", default='EO')
     parser.add_argument("--lamda", type=float, help="the trade-off parameter of the pi", default=0.5)
     args = parser.parse_args()
